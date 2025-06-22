@@ -1,46 +1,61 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
+	"github.com/urfave/cli/v2"
 	"qbuploader/internal/config"
 	"qbuploader/internal/database"
 	"qbuploader/internal/logger"
-	"qbuploader/internal/qbittorrent" // 导入 qbittorrent 包
+	"qbuploader/internal/scheduler"
 )
 
 func main() {
-	// 初始化所有基础模块...
+	// 基础模块初始化
 	if err := config.Init(); err != nil {
-		// ...
+		fmt.Fprintf(os.Stderr, "[CRITICAL] 配置初始化失败！程序无法启动。\n           原因: %v\n", err)
 		os.Exit(1)
 	}
 	logger.Init()
 	if err := database.Init(); err != nil {
-		// ...
+		logger.Log.Errorf("数据库初始化失败！程序无法启动。")
+		logger.Log.Errorf("原因: %v", err)
 		os.Exit(1)
 	}
 	defer database.DB.Close()
 
 	log := logger.Log
-	log.Info("qBittorrent Uploader v1.0.0 (alpha) 启动...")
 
-	// --- 新的测试代码 ---
-	log.Info("正在尝试连接到 qBittorrent...")
-	qbClient, err := qbittorrent.NewClient()
-	if err != nil {
-		log.Errorf("无法连接到 qBittorrent: %v", err)
-		log.Errorf("请确保 qBittorrent 正在运行，Web UI 已开启，并且 config.ini 中的地址、用户名、密码正确。")
-		os.Exit(1)
+	// 使用 urfave/cli 定义命令行应用
+	app := &cli.App{
+		Name:  "qbuploader",
+		Usage: "qBittorrent 自动化保种与备份工具",
+		Commands: []*cli.Command{
+			{
+				Name:  "upload",
+				Usage: "上传单个任务 (由 qBittorrent '任务完成时' 调用)",
+				Action: func(c *cli.Context) error {
+					if c.NArg() < 3 {
+						return fmt.Errorf("upload 命令需要 3 个参数: content_path, torrent_name, info_hash")
+					}
+					contentPath := c.Args().Get(0)
+					torrentName := c.Args().Get(1)
+					infoHash := c.Args().Get(2)
+					return scheduler.RunUploadMode(infoHash, torrentName, contentPath)
+				},
+			},
+			{
+				Name:  "cleanup",
+				Usage: "执行定期巡检和清理 (由 Windows 任务计划程序调用)",
+				Action: func(c *cli.Context) error {
+					return scheduler.RunCleanupMode()
+				},
+			},
+		},
 	}
 
-	// 如果连接成功，尝试获取种子列表
-	torrents, err := qbClient.GetTorrents()
-	if err != nil {
-		log.Errorf("获取种子列表失败: %v", err)
-		os.Exit(1)
+	if err := app.Run(os.Args); err != nil {
+		log.Fatalf("程序执行出错: %v", err)
 	}
-	log.Infof("成功获取到种子列表！当前共有 %d 个任务。", len(torrents))
-
-	log.Info("外部交互模块测试成功！")
 }
