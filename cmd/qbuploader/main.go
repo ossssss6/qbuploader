@@ -5,27 +5,33 @@ import (
 	"os"
 
 	"qbuploader/internal/config"
+	"qbuploader/internal/database"
 	"qbuploader/internal/logger"
 )
 
 func main() {
+	// 1. 初始化配置
 	if err := config.Init(); err != nil {
-		// 在日志系统初始化前，只能用 fmt 打印
 		fmt.Fprintf(os.Stderr, "[CRITICAL] 配置初始化失败！程序无法启动。\n           原因: %v\n", err)
 		os.Exit(1)
 	}
 
+	// 2. 初始化日志
 	logger.Init()
-
 	log := logger.Log
 
-	// --- 验证阶段 ---
-	log.Info("qBittorrent Uploader v1.0.0 (alpha) 启动...")
-	log.Debug("这是一条 DEBUG 信息，只有在 debug 模式下可见。")
-	log.Info("配置文件加载成功！")
-	log.Infof("将上传到网盘目录: %s", config.Cfg.Uploader.RemoteDir)
-	log.Warn("这是一个警告信息，表示可能有问题，但程序可以继续。")
-	log.Error("这是一个错误信息，表示发生了严重问题。\n         这第二行是错误的详细解释，\n         第三行也是。")
+	// 3. 初始化数据库
+	if err := database.Init(); err != nil {
+		log.Errorf("数据库初始化失败！程序无法启动。")
+		log.Errorf("原因: %v", err)
+		os.Exit(1)
+	}
+	// 程序退出前，安全地关闭数据库连接
+	defer database.DB.Close()
 
-	// TODO: 初始化数据库模块，并根据命令行参数选择运行模式
+	log.Info("qBittorrent Uploader v1.0.0 (alpha) 启动...")
+	log.Info("配置、日志、数据库模块均已成功初始化！")
+	log.Warn("程序当前没有实现任何功能，运行后会直接退出。")
+
+	// TODO: 根据命令行参数选择运行模式
 }
