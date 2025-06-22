@@ -76,9 +76,6 @@ func Init() error {
 	// 使用 filepath.Join 来安全地拼接路径
 	configPath := filepath.Join(wd, "config.ini")
 
-	// 为了调试，我们暂时保留这条打印信息
-	fmt.Printf("[DEBUG] 正在基于当前工作目录寻找配置文件: %s\n", configPath)
-
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return fmt.Errorf("配置文件 'config.ini' 不存在于当前目录！请将 'config.ini.example' 复制一份并重命名为 'config.ini'")
 	}
