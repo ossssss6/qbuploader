@@ -9,10 +9,8 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-// Cfg 是一个全局变量，所有其他模块都可以通过它来访问配置。
 var Cfg *Config
 
-// Config 结构体是我们程序内部使用的“标准参数表”。
 type Config struct {
 	Uploader struct {
 		Path      string
@@ -25,9 +23,11 @@ type Config struct {
 		Password string
 	}
 	SeedingPolicy struct {
-		TargetRatio        float64
-		TargetSeedingHours int
-		ActionAfterProcess string
+		// TargetRatio 和 TargetSeedingHours 不再使用，但暂时保留以防未来需要
+		TargetRatio           float64
+		TargetSeedingHours    int
+		ActionAfterProcess    string
+		Cleanup_Target_States string // <<<--- 【新增】在最终使用的 Config 结构体中添加
 	}
 	General struct {
 		LogLevel string
@@ -39,7 +39,6 @@ type Config struct {
 	}
 }
 
-// rawConfig 结构体精确对应 config.ini 文件中的“问卷式”键名。
 type rawConfig struct {
 	Uploader struct {
 		Path          string `ini:"Path"`
@@ -52,9 +51,10 @@ type rawConfig struct {
 		Password string `ini:"Password"`
 	} `ini:"qBittorrent"`
 	SeedingPolicy struct {
-		TargetRatio        float64 `ini:"Target_Ratio"`
-		TargetSeedingHours int     `ini:"Target_Seeding_Hours"`
-		ActionAfterProcess string  `ini:"Action_After_Process"`
+		TargetRatio           float64 `ini:"Target_Ratio"`
+		TargetSeedingHours    int     `ini:"Target_Seeding_Hours"`
+		ActionAfterProcess    string  `ini:"Action_After_Process"`
+		Cleanup_Target_States string  `ini:"Cleanup_Target_States"` // <<<--- 【新增】在原始 rawConfig 结构体中添加
 	} `ini:"Seeding_Policy"`
 	General struct {
 		LogMode string `ini:"Log_Mode"`
@@ -66,18 +66,15 @@ type rawConfig struct {
 	} `ini:"Maintenance"`
 }
 
-// Init 函数是这个模块的唯一入口。
 func Init() error {
-	// --- 新的、正确的策略：基于当前工作目录寻找配置文件 ---
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("无法获取当前工作目录: %w", err)
 	}
-	// 使用 filepath.Join 来安全地拼接路径
 	configPath := filepath.Join(wd, "config.ini")
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return fmt.Errorf("配置文件 'config.ini' 不存在于当前目录！请将 'config.ini.example' 复制一份并重命名为 'config.ini'")
+		return fmt.Errorf("配置文件 'config.ini' 不存在！请将 'config.ini.example' 复制一份并重命名为 'config.ini'")
 	}
 
 	iniCfg, err := ini.Load(configPath)
@@ -90,25 +87,28 @@ func Init() error {
 		return fmt.Errorf("解析 config.ini 失败: %w", err)
 	}
 
-	// --- 将“问卷答案”翻译成“标准参数” ---
 	Cfg = new(Config)
+	// ... (其他赋值不变)
 	Cfg.Uploader.Path = rawCfg.Uploader.Path
 	Cfg.Uploader.RemoteDir = rawCfg.Uploader.MyCloudFolder
 	Cfg.Uploader.ExtraArgs = strings.Fields(rawCfg.Uploader.ExtraArgs)
 	Cfg.QBittorrent.Host = rawCfg.QBittorrent.Host
 	Cfg.QBittorrent.Username = rawCfg.QBittorrent.Username
 	Cfg.QBittorrent.Password = rawCfg.QBittorrent.Password
+
+	// SeedingPolicy 部分
 	Cfg.SeedingPolicy.TargetRatio = rawCfg.SeedingPolicy.TargetRatio
 	Cfg.SeedingPolicy.TargetSeedingHours = rawCfg.SeedingPolicy.TargetSeedingHours
 	Cfg.SeedingPolicy.ActionAfterProcess = rawCfg.SeedingPolicy.ActionAfterProcess
+	Cfg.SeedingPolicy.Cleanup_Target_States = rawCfg.SeedingPolicy.Cleanup_Target_States // <<<--- 【新增】将读取到的值赋给最终配置
 
+	// ... (其他赋值不变)
 	switch strings.ToLower(rawCfg.General.LogMode) {
 	case "debug":
 		Cfg.General.LogLevel = "debug"
 	default:
-		Cfg.General.LogLevel = "normal" // 保持和 config.ini.example 中的默认值一致
+		Cfg.General.LogLevel = "normal"
 	}
-
 	Cfg.Maintenance.LogMaxSizeMB = rawCfg.Maintenance.LogMaxSizeMB
 	Cfg.Maintenance.LogMaxBackups = rawCfg.Maintenance.LogMaxBackups
 	Cfg.Maintenance.DBKeepArchivedDays = rawCfg.Maintenance.DBKeepArchivedDays

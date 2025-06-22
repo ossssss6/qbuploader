@@ -36,15 +36,17 @@ Username = your_qb_username
 Password = your_qb_password
 
 [Seeding_Policy]
-; --- 智能保种策略 ---
-; 只有满足以下任一条件的任务，才会被上传和删除。
-Target_Ratio = 2.0
-Target_Seeding_Hours = 72
+; --- 清理目标状态 ---
+; 当一个任务在 qBittorrent 中处于以下任一状态时，
+; 并且它已经被成功上传，程序才会尝试清理它。
+; 多个状态用逗号分隔，不区分大小写。
+; 常见状态: pausedUP, stalledUP
+Cleanup_Target_States = pausedUP, stalledUP
 
 ; --- 任务完成后在 qBittorrent 中的操作 ---
 ; 当文件上传和清理都完成后，如何处理 qBittorrent 里的任务记录。
 ;   "delete":       彻底删除任务和种子。
-;   "pause":        暂停任务。
+;   "pause":        暂停任务。(此选项在当前逻辑下意义不大)
 ;   "do_nothing":   什么也不做。
 Action_After_Process = delete
 
